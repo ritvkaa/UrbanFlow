@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UrbanFlow – Smart City Adventure</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="scanline"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00c8ff" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">URBANFLOW</div>
+      <div class="logo-sub">AI CROWD MONITORING v1.0 · LIVE BACKEND</div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="conn-dot"></div>
+    <span class="status-label" id="conn-label">CONNECTING…</span>
+    <span class="time-display" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<!-- Upload banner -->
+<div class="upload-bar">
+  <span>🗺️ LOAD CITY DATA</span>
+  <input type="file" id="csv-input" accept=".csv" style="display:none">
+  <button class="btn btn-sm" onclick="document.getElementById('csv-input').click()">📂 LOAD CSV</button>
+  <span id="upload-msg" class="upload-msg"></span>
+  <span style="margin-left:auto;font-size:11px">CITY DATA READY</span>
+</div>
+
+<!-- Small side dashboard: keeps the existing main layout unchanged -->
+<aside class="side-dashboard">
+  <div class="side-title">CITY MAP</div>
+  <div class="side-status"><span class="side-live-dot" id="side-live-dot"></span><span id="side-status">CONNECTING</span></div>
+  <div class="side-metric"><span>FOOTFALL</span><strong id="side-total">—</strong></div>
+  <div class="side-metric"><span>CONGESTION</span><strong id="side-rate">—</strong></div>
+  <div class="side-metric"><span>ALERTS</span><strong id="side-alerts">—</strong></div>
+  <div class="side-metric"><span>CLEAR ZONES</span><strong id="side-clear">—</strong></div>
+  <div class="side-divider"></div>
+  <button class="side-btn" onclick="refreshData()">↻ REFRESH</button>
+  <button class="side-btn side-btn-danger" onclick="triggerSpike()">⚡ SPIKE</button>
+  <button class="side-btn side-btn-success" onclick="clearSpike()">✓ CLEAR</button>
+  <div class="side-note">Heatmap updates with live zone density.</div>
+</aside>
+
+<div class="main">
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card blue"><div class="kpi-label">Total Footfall</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub" id="kpi-zones">Loading…</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Clear Zones</div><div class="kpi-value" id="kpi-clear">—</div><div class="kpi-sub">of 20 monitored</div></div>
+    <div class="kpi-card yellow"><div class="kpi-label">Active Alerts</div><div class="kpi-value" id="kpi-alerts">—</div><div class="kpi-sub" id="kpi-alert-sub">—</div></div>
+    <div class="kpi-card red"><div class="kpi-label">Congestion Rate</div><div class="kpi-value" id="kpi-rate">—</div><div class="kpi-sub" id="kpi-rate-sub">—</div></div>
+  </div>
+
+  <!-- Heatmap + Alerts -->
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title"><span class="dot"></span>Zone Density Heatmap</span>
+        <span class="panel-badge warn" id="live-badge">WAITING</span>
+      </div>
+      <div class="heatmap-wrap">
+        <div class="zone-grid" id="zone-grid"><div class="loading-msg">Click REFRESH DATA to load zones…</div></div>
+        <div class="heat-legend">
+          <span>DENSITY (p/m²):</span>
+          <span class="legend-item"><span class="legend-dot" style="background:rgba(0,255,170,0.5)"></span>LOW &lt;0.7</span>
+          <span class="legend-item"><span class="legend-dot" style="background:rgba(255,170,0,0.5)"></span>MEDIUM 0.7–1.5</span>
+          <span class="legend-item"><span class="legend-dot" style="background:rgba(255,136,0,0.5)"></span>HIGH 1.5–2.5</span>
+          <span class="legend-item"><span class="legend-dot" style="background:rgba(255,58,92,0.5)"></span>CRITICAL &gt;2.5</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title"><span class="dot" style="background:var(--danger)"></span>City Alerts</span>
+        <span class="panel-badge danger" id="alert-badge">0 ACTIVE</span>
+      </div>
+      <div class="alerts-wrap" id="alerts-wrap"><div class="loading-msg">No alerts yet.</div></div>
+    </div>
+  </div>
+
+  <!-- Bar Chart + Routes -->
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title"><span class="dot" style="background:var(--accent2)"></span>Pedestrian Traffic</span>
+        <span class="panel-badge">LIVE DATA</span>
+      </div>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="bar-chart"><div class="loading-msg">No data</div></div>
+        <div class="controls">
+          <button class="btn btn-primary" onclick="refreshData()">↻ REFRESH DATA</button>
+          <button class="btn btn-danger" onclick="triggerSpike()">⚡ SPIKE: Metro+Food Court</button>
+          <button class="btn btn-success" onclick="clearSpike()">✓ CLEAR SPIKES</button>
+          <div class="auto-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" id="auto-refresh" onchange="toggleAuto(this.checked)">
+              <span>AUTO (10s)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title"><span class="dot" style="background:var(--accent2)"></span>Safe Route Guide</span>
+        <span class="panel-badge">ML SCORED</span>
+      </div>
+      <div class="routes-wrap" id="routes-wrap"><div class="loading-msg">Loading routes…</div></div>
+    </div>
+  </div>
+
+  <!-- Trend chart -->
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <span class="panel-title"><span class="dot" style="background:var(--warn)"></span>City Traffic History</span>
+      <select id="history-zone" class="zone-select" onchange="loadHistory()">
+        <option value="">All zones (avg)</option>
+      </select>
+    </div>
+    <div class="trend-wrap">
+      <canvas id="trend-canvas" height="80"></canvas>
+      <div class="trend-legend">
+        <span class="tl-item"><span class="tl-dot" style="background:var(--accent)"></span>Density</span>
+        <span class="tl-item"><span class="tl-dot" style="background:var(--danger)"></span>Threshold (1.5)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-bar">
+  <span>UrbanFlow v1.0</span>
+  <span class="sep">|</span>
+  <span>Backend: FastAPI + SQLite</span>
+  <span class="sep">|</span>
+  <span>ML: IsolationForest + Threshold</span>
+  <span class="sep">|</span>
+  <span id="footer-status" style="color:var(--accent2)">● Starting up…</span>
+</div>
+
+<div class="tooltip-box" id="tooltip">
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-row">People: <span id="tt-count"></span></div>
+  <div class="tt-row">Density: <span id="tt-density"></span> p/m²</div>
+  <div class="tt-row">Status: <span id="tt-status"></span></div>
+  <div class="tt-row">Anomaly: <span id="tt-anomaly"></span></div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
