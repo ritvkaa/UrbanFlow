@@ -547,17 +547,108 @@ function toggleAuto(on) {
 document.getElementById('csv-input').addEventListener('change', async function () {
   const file = this.files[0];
   if (!file) return;
+
   const msg = document.getElementById('upload-msg');
-  msg.textContent = 'Uploading…';
-  const form = new FormData();
-  form.append('file', file);
+
   try {
-    const res = await apiFetch('/api/readings/upload', { method: 'POST', body: form });
+    msg.textContent = 'Reading CSV…';
+
+    const text = await file.text();
+
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+    if (lines.length < 2) {
+      throw new Error('CSV is empty.');
+    }
+
+    // Parse header
+    const headers = lines[0]
+      .split(',')
+      .map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+
+    const locationIndex = headers.indexOf('location_id');
+
+    const countCandidates = [
+      'total_of_directions',
+      'pedestrian_count',
+      'pedestrians',
+      'footfall',
+      'count',
+      'people_count',
+      'people'
+    ];
+
+    const countIndex = countCandidates
+      .map(name => headers.indexOf(name))
+      .find(index => index !== -1);
+
+    if (locationIndex === -1) {
+      throw new Error('Location_ID column not found.');
+    }
+
+    if (countIndex === undefined) {
+      throw new Error('Pedestrian count column not found.');
+    }
+
+    // Aggregate pedestrian counts by Location_ID
+    const totals = {};
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',');
+
+      const location = values[locationIndex]?.trim();
+      const count = Number(values[countIndex]);
+
+      if (!location || !Number.isFinite(count)) continue;
+
+      if (!totals[location]) {
+        totals[location] = {
+          location_id: location,
+          total: 0,
+          rows: 0
+        };
+      }
+
+      totals[location].total += count;
+      totals[location].rows += 1;
+    }
+
+    const aggregated = Object.values(totals);
+
+    if (!aggregated.length) {
+      throw new Error('No valid Location_ID / pedestrian count data found.');
+    }
+
+    // Convert aggregated data into the format expected by the existing backend
+    let csv = 'Location_ID,Total_of_Directions\n';
+
+    aggregated.forEach(item => {
+      const average = item.total / item.rows;
+
+      csv += `${item.location_id},${average}\n`;
+    });
+
+    msg.textContent = `Processing ${aggregated.length} locations…`;
+
+    // Send only the tiny aggregated CSV to the existing endpoint
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const form = new FormData();
+    form.append('file', blob, 'urbanflow_aggregated.csv');
+
+    const res = await apiFetch('/api/readings/upload', {
+      method: 'POST',
+      body: form
+    });
+
     msg.textContent = `✓ ${res.rows_processed} zones processed. Refreshing…`;
+
     await refreshData();
-  } catch {
-    msg.textContent = '✗ Upload failed';
+
+  } catch (error) {
+    console.error('CSV upload error:', error);
+    msg.textContent = `✗ ${error.message || 'Upload failed'}`;
   }
+
   this.value = '';
 });
 
