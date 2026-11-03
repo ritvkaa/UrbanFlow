@@ -1,174 +1,196 @@
-# 🏙️ UrbanFlow – Smart Crowd Monitoring System
+# UrbanFlow — Smart Crowd Monitoring System
 
-AI-powered pedestrian movement analysis with real-time congestion detection, ML anomaly flagging, and route recommendations.
+UrbanFlow is a crowd monitoring prototype designed to analyse pedestrian density across multiple urban zones, identify unusual crowd patterns, and provide congestion-aware route recommendations.
 
----
+The system combines density-based classification, machine learning-based anomaly detection, interactive visualisations, and a REST API to make crowd conditions easier to monitor and understand.
 
-## Tech Stack
+## Overview
 
-| Layer | Technology |
+UrbanFlow monitors pedestrian activity across 20 predefined zones. Each zone is analysed using its pedestrian count and available area to calculate crowd density.
+
+The system then:
+- Classifies zones according to crowd density.
+- Detects unusual readings using an Isolation Forest model.
+- Displays congestion levels through an interactive dashboard.
+- Generates alerts for congested or anomalous conditions.
+- Ranks predefined routes using congestion-based scoring.
+- Supports CSV uploads for analysing custom crowd data.
+
+**Note:** The current prototype uses simulated pedestrian readings and uploaded CSV data. It is not connected to live CCTV feeds or real-world sensor networks.
+
+## Features
+
+### Crowd Monitoring Dashboard
+- Interactive heatmap displaying crowd density across 20 zones.
+- Colour-coded congestion levels.
+- Zone-level information and density metrics.
+- Footfall bar charts and historical density trends.
+- Automatically refreshed dashboard data.
+
+### Machine Learning-Based Anomaly Detection
+- Uses Scikit-learn's Isolation Forest algorithm.
+- Trains on synthetic historical density readings generated during application startup.
+- Flags readings that deviate from learned patterns.
+- Displays detected anomalies in the monitoring interface.
+
+### Density Classification
+
+Crowd density is calculated as:
+
+`Density = Number of People / Area (m²)`
+
+| Density (people/m²) | Classification |
 |---|---|
-| Backend API | FastAPI (Python) |
-| Database | SQLite via SQLAlchemy ORM |
-| ML Engine | Scikit-learn IsolationForest + threshold logic |
-| Frontend | Vanilla JS + Jinja2 templates |
-| Data Simulation | NumPy realistic crowd generator |
-| Tests | Pytest (12 tests, 100% pass) |
+| Below 0.7 | LOW |
+| 0.7 – below 1.5 | MEDIUM |
+| 1.5 – below 2.5 | HIGH |
+| 2.5 and above | CRITICAL |
 
----
+### Congestion Alerts
+- Generates alerts based on congestion and anomaly conditions.
+- Stores alerts for later review.
+- Supports alert acknowledgement through the API.
 
-## Quick Start
+### Route Recommendations
+- Evaluates four predefined routes.
+- Applies congestion penalties to route scores.
+- Ranks routes according to their resulting scores.
+- Categorises routes as CLEAR, BUSY, or BLOCKED.
 
-```bash
-# 1. Clone / unzip the project
-cd urbanflow
+### Custom Data Analysis
+- Upload crowd readings through CSV files.
+- Analyse custom zone-level pedestrian data.
+- Simulate congestion spikes to test system behaviour.
 
-# 2. Install dependencies
-pip install -r requirements.txt
+## Technology Stack
 
-# 3. Run the server
-uvicorn main:app --reload --port 8000
+| Component | Technologies |
+|---|---|
+| Backend | Python, FastAPI |
+| Database | SQLite, SQLAlchemy |
+| Machine Learning | Scikit-learn, Isolation Forest |
+| Data Processing | NumPy, Pandas |
+| Frontend | HTML, CSS, JavaScript, Jinja2 |
+| Visualisation | Interactive heatmap, charts, Canvas |
+| Testing | Pytest |
 
-# 4. Open your browser
-# http://localhost:8000
-```
+## System Architecture
 
-That's it. The DB is auto-created, the ML model is trained on startup.
+The application follows a modular architecture:
 
----
+1. **Frontend:** Displays crowd density, alerts, metrics, and route recommendations.
+2. **API Layer:** Handles dashboard requests, data uploads, alerts, and simulation endpoints.
+3. **Analysis Engine:** Calculates density, classifies congestion, and detects anomalies.
+4. **Database Layer:** Stores zones, crowd readings, alerts, and route information.
+5. **Data Simulator:** Generates synthetic pedestrian readings for testing and demonstration.
 
 ## Project Structure
 
-```
-urbanflow/
-├── main.py                        # FastAPI app + lifespan (DB init, ML training)
+```text
+UrbanFlow/
+├── main.py
 ├── requirements.txt
-├── README.md
-│
 ├── backend/
 │   ├── models/
-│   │   └── database.py            # SQLAlchemy models: Zone, CrowdReading, Alert, Route
+│   │   └── database.py
 │   ├── ml/
-│   │   └── analyzer.py            # IsolationForest anomaly detection + classify_density
+│   │   └── analyzer.py
 │   ├── services/
-│   │   ├── simulator.py           # Realistic crowd data generator (20 zones)
-│   │   └── alert_service.py       # Alert generation, persistence, acknowledgement
+│   │   ├── simulator.py
+│   │   └── alert_service.py
 │   └── routers/
-│       └── api.py                 # All REST endpoints
-│
+│       └── api.py
 ├── frontend/
 │   ├── templates/
-│   │   └── index.html             # Dashboard HTML (Jinja2)
+│   │   └── index.html
 │   └── static/
-│       ├── css/style.css          # Full dark cyberpunk stylesheet
-│       └── js/app.js              # Frontend JS — fetches real API
-│
+│       ├── css/
+│       └── js/
 ├── data/
-│   └── sample_crowd_data.csv      # Upload test file
-│
+│   └── sample_crowd_data.csv
 └── tests/
-    └── test_api.py                # 12 pytest tests
+    └── test_api.py
 ```
 
----
+## Getting Started
 
-## REST API Reference
+### Prerequisites
 
-| Method | Endpoint | Description |
+- Python 3.10 or later
+- pip
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ritvkaa/UrbanFlow.git
+cd UrbanFlow
+```
+
+Install the dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start the application:
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+Open the dashboard:
+
+```text
+http://localhost:8000
+```
+
+Interactive API documentation is available at:
+
+```text
+http://localhost:8000/docs
+```
+
+The database is initialised and the anomaly detection model is trained when the application starts.
+
+## API Endpoints
+
+| Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/` | Live dashboard UI |
-| GET | `/health` | Health check |
-| GET | `/api/zones` | All 20 zones with latest readings |
-| POST | `/api/readings/refresh` | Generate + analyse new readings |
-| POST | `/api/readings/upload` | Upload custom CSV |
-| GET | `/api/alerts?limit=20` | Recent alerts |
+| GET | `/` | Dashboard |
+| GET | `/health` | Application health check |
+| GET | `/api/zones` | Retrieve zone information |
+| POST | `/api/readings/refresh` | Generate and analyse readings |
+| POST | `/api/readings/upload` | Upload custom CSV data |
+| GET | `/api/alerts` | Retrieve recent alerts |
 | POST | `/api/alerts/{id}/ack` | Acknowledge an alert |
-| GET | `/api/routes` | ML-scored route recommendations |
-| GET | `/api/stats` | Aggregated system metrics |
-| POST | `/api/simulate/spike` | Force congestion in zones (JSON array) |
-| POST | `/api/simulate/clear` | Clear all spikes |
-| GET | `/api/history?zone_id=A1&limit=60` | Historical readings |
-
-Interactive docs: **http://localhost:8000/docs**
-
----
-
-## ML Engine
-
-### 1. Threshold-Based Classification
-```
-Density (people/m²) → Status
-< 0.7              → LOW       (no action)
-0.7 – 1.5         → MEDIUM    (monitor)
-1.5 – 2.5         → HIGH      (warning)
-> 2.5              → CRITICAL  (alert)
-```
-
-### 2. Anomaly Detection (IsolationForest)
-- Trains on 80 rounds of synthetic historical data at startup
-- Flags readings that deviate from learned normal patterns
-- Shown as ⚡ markers on the heatmap
-
-### 3. Route Scoring
-- 4 pre-defined routes scored 0–100
-- Penalty applied for each congested zone on route path
-- Status: CLEAR (≥70), BUSY (≥40), BLOCKED (<40)
-
----
-
-## Dashboard Features
-
-- **Live Heatmap** — 20 zones, color-coded by density (click for tooltip)
-- **Alert Feed** — Real-time alerts from backend, click to acknowledge
-- **Footfall Bar Chart** — All zones, updates on every refresh
-- **AI Route Suggestions** — ML-scored, sorted by safety score
-- **History Trend Chart** — Canvas-rendered density timeline per zone
-- **CSV Upload** — Drop your own data file in
-- **Spike Simulation** — Test congestion scenarios
-- **Auto-Refresh** — 10-second polling mode
-
----
+| GET | `/api/routes` | Retrieve route recommendations |
+| GET | `/api/stats` | Retrieve monitoring statistics |
+| POST | `/api/simulate/spike` | Simulate congestion |
+| POST | `/api/simulate/clear` | Clear simulated spikes |
+| GET | `/api/history` | Retrieve historical readings |
 
 ## Running Tests
+
+Run the test suite using:
 
 ```bash
 pytest tests/ -v
 ```
 
-Expected: **12 passed**
+The existing project test suite contains 12 tests.
 
----
+## Future Improvements
 
-## Deployment
+- Integration with live pedestrian counting systems.
+- Camera-based people detection and tracking.
+- Dynamic route generation based on real-time map data.
+- Deployment with a persistent production database.
+- Improved anomaly detection using larger real-world datasets.
 
-### Local (development)
-```bash
-uvicorn main:app --reload --port 8000
-```
+## Project Information
 
-### Production
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
-```
+**Project:** UrbanFlow — Smart Crowd Monitoring System  
+**Repository:** [github.com/ritvkaa/UrbanFlow](https://github.com/ritvkaa/UrbanFlow)
 
-### Docker (optional)
-```dockerfile
-FROM python:3.12-slim
-WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
----
-
-## Sample CSV Format
-
-Upload your own readings at `/api/readings/upload`:
-
-```csv
-zone_id,people_count,area_sqm
-A1,120,50
-B3,400,150
-C4,135,45
-```
